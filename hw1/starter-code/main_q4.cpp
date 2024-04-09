@@ -8,7 +8,11 @@
 // TODO: add your function here. The function should count the number of
 // entries between lb and ub.
 unsigned int count_range(const std::set<double>& data, const double lb,
-                         const double ub) {}
+                         const double ub) {
+  auto lower = data.lower_bound(lb);
+  auto upper = data.upper_bound(ub);
+  return std::distance(lower, upper);
+}
 
 int main() {
   std::set<double> data_simple{0, 1, 2, 3, 4, 5, 6};

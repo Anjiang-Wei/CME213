@@ -105,3 +105,9 @@ Modifications for Raw Pointers:
 If the code were to use raw pointers instead of std::shared_ptr, you would need to manually manage the memory allocated for SparseMatrix and ToeplitzMatrix instances. This would include allocating memory with new when creating the instances and deallocating it with delete when it's no longer needed.
 
 Problem 4:
+
+Result:
+```
+Error: range test.
+X = number of elements in range [-1, 1]: 6843 (approx. 99% confidence interval for X: (6707.11, 6946.89))
+```
