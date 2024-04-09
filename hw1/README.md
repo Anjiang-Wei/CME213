@@ -1,4 +1,4 @@
-Problem 1:
+## Problem 1:
 I implement all the required test cases, and the output is as follows:
 ```
 [==========] Running 8 tests from 1 test suite.
@@ -32,7 +32,7 @@ I implement all the required test cases, and the output is as follows:
 I linearize the 2D matrix into a 1D array according to this formula:
     int linearize = i * n_ + j - (i + 1) * i / 2;
 
-Problem 2:
+## Problem 2:
 I implement the 4 required tests. Result is
 ```
 [==========] Running 5 tests from 1 test suite.
@@ -80,13 +80,19 @@ In the implementation of the multiplication, we use the following logic:
         }
     }
 ```
-The result matrix's size is decided by the maximum of the two matrices' dimensions. the "std::min" will compute to 0 as the index for the 1-size dimension.
+The result matrix's size is decided by the maximum of the two matrices' dimensions (because one may be 1, and the other may be bigger). the "std::min" will compute to 0 as the index for the 1-size dimension used as the index for iteration for the matrix used as broadcasting.
 
 Copy/Move constructor is necessary for dynamically allocated array because of the need for deep copy. Shallow copy can lead to double-free problem and dangling pointer problem.
 Also, move construcotr and move assignment operator can make resource transfer more efficient and prevent resource leak.
 
 
-Problem 3:
+## Problem 3:
+
+Result:
+```
+sparse
+toeplitz
+```
 
 1)  Run-time Polymorphism: In the given code, run-time polymorphism is implemented through the use of virtual functions and inheritance. The Matrix class declares a pure virtual function repr(). This function is then overridden in the derived classes SparseMatrix and ToeplitzMatrix. The choice of which repr() function to call (from SparseMatrix or ToeplitzMatrix) is made at run time, depending on the type of object pointed to by the Matrix pointer in the vector. This run-time behavior is a classic example of polymorphism in object-oriented programming.
 Compile-time Polymorphism: The use of templates of Matrix in std::vector and std::shared_ptr is an example of compile-time polymorphism, as these templates are resolved at compile-time to work with specific types (Matrix, concretized by SparseMatrix, ToeplitzMatrix).
@@ -104,10 +110,23 @@ std::shared_ptr, on the other hand, is a smart pointer that manages the memory o
 Modifications for Raw Pointers:
 If the code were to use raw pointers instead of std::shared_ptr, you would need to manually manage the memory allocated for SparseMatrix and ToeplitzMatrix instances. This would include allocating memory with new when creating the instances and deallocating it with delete when it's no longer needed.
 
-Problem 4:
+## Problem 4:
 
 Result:
 ```
 Error: range test.
 X = number of elements in range [-1, 1]: 6843 (approx. 99% confidence interval for X: (6707.11, 6946.89))
+```
+
+
+## Problem 5:
+```
+Q5a: PASSED
+Q5b: PASSED
+Q5b: PASSED
+Q5b: PASSED
+Q5b: PASSED
+Q5c: PASSED
+Q5d empty list: PASSED
+Q5d: PASSED
 ```
