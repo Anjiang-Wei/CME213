@@ -4,3 +4,10 @@ main.dSYM/
 .*.swp
 .*.swo
 .DS_Store
+/Makefile
+*Makefile
+Makefile
+main_q1
+main_q2
+main_q3
+gtest_main.a
