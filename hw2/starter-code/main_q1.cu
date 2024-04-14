@@ -84,6 +84,7 @@ class RecurrenceTestFixture : public ::testing::Test {
     // Hint: use cudaMalloc
     cudaMalloc(&device_input_array, num_bytes);
     cudaMalloc(&device_output_array, num_bytes);
+  
   }
 
   // TODO: deallocate memory from both device arrays
