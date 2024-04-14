@@ -43,6 +43,7 @@ extern const size_t ITER_MAX_CHECK = 10;
 // between -1 and 1 
 void initialize_array(vec &input_array, size_t arr_size) {
   srand(time(0));
+  input_array.resize(arr_size);
   for (size_t i = 0; i < arr_size; i++) {
     input_array[i] = (elem_type)rand() / (elem_type)RAND_MAX * 2 - 1;
   }
