@@ -40,9 +40,12 @@ extern const size_t ITER_MAX_CHECK = 10;
 */
 
 // TODO: initialize an array of size arr_size in input_array with random floats
-// between -1 and 1
+// between -1 and 1 
 void initialize_array(vec &input_array, size_t arr_size) {
-
+  srand(time(0));
+  for (size_t i = 0; i < arr_size; i++) {
+    input_array[i] = (elem_type)rand() / (elem_type)RAND_MAX * 2 - 1;
+  }
 }
 
 void host_recurrence(vec &input_array, vec &output_array, size_t num_iter,
@@ -79,12 +82,14 @@ class RecurrenceTestFixture : public ::testing::Test {
 
     // TODO: allocate num_bytes of memory to the device arrays.
     // Hint: use cudaMalloc
-
+    cudaMalloc(&device_input_array, num_bytes);
+    cudaMalloc(&device_output_array, num_bytes);
   }
 
   // TODO: deallocate memory from both device arrays
   ~RecurrenceTestFixture() {
-
+    cudaFree(device_input_array);
+    cudaFree(device_output_array);
   }
 
   void initialize() {
