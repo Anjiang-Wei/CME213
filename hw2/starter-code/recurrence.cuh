@@ -21,8 +21,10 @@ typedef float elem_type;
 __global__ void recurrence(const elem_type* input_array,
                            elem_type* output_array, size_t num_iter,
                            size_t array_length) {
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i < array_length) {
+    for (int i = blockDim.x * blockIdx.x + threadIdx.x;
+          i < array_length;
+          i += blockDim.x * gridDim.x)
+    {
         elem_type c = input_array[i];
         elem_type z = 0;
         for (int it = 0; it < num_iter; it++) {
@@ -54,10 +56,7 @@ double doGPURecurrence(const elem_type* d_input, elem_type* d_output,
   event_pair timer;
   start_timer(&timer);
   // TODO: launch kernel
-
-  size_t my_grid_size = (array_length + block_size - 1) / block_size;
-  recurrence<<<my_grid_size, block_size>>>(d_input, d_output, num_iter, array_length);
-
+  recurrence<<<grid_size, block_size>>>(d_input, d_output, num_iter, array_length);
   check_launch("gpu recurrence");
   return stop_timer(&timer);
 }
