@@ -13,6 +13,12 @@ __global__ void elementwise_add(const int *x, const int *y,
     // Distribute the work across all CUDA threads allocated by
     // elementwise_add<<<72, 1024>>>(x, y, z, stride, N);
     // Use the CUDA variables gridDim, blockDim, blockIdx, and threadIdx.
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+             i < size;
+             i += blockDim.x * gridDim.x)
+    {
+        z[i * stride] = x[i * stride] + y[i * stride];
+    }
 }
 
 #endif
