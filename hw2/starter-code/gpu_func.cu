@@ -16,21 +16,32 @@
 DeviceAllocator::DeviceAllocator(nn_real *cpu_data, int n)
 {
   // TODO: implement this constructor
+  this->nbytes = n * sizeof(nn_real);
+  // Allocate memory on the GPU and copy the CPU data to the GPU.
+  checkCudaErrors(cudaMalloc(&this->data, this->nbytes));
+  checkCudaErrors(cudaMemcpy(this->data, cpu_data, this->nbytes, cudaMemcpyHostToDevice));
 }
 
 DeviceAllocator::DeviceAllocator(int n)
 {
   // TODO: implement this constructor
+  // Only allocate memory on the GPU.
+  checkCudaErrors(cudaMalloc(&this->data, n * sizeof(nn_real)));
+  this->nbytes = n * sizeof(nn_real);
 }
 
 DeviceAllocator::~DeviceAllocator()
 {
   // TODO: implement this destructor
+  // Deallocate the memory on the GPU.
+  checkCudaErrors(cudaFree(this->data));
 }
 
 void DeviceAllocator::to_cpu(nn_real *cpu_data)
 {
   // TODO: implement this function
+  // Copy the GPU data to the CPU pointer.
+  checkCudaErrors(cudaMemcpy(cpu_data, this->data, this->nbytes, cudaMemcpyDeviceToHost));
 }
 
 // +-*=+-*=+-*=+-*=+-*=+-*=+-*=+-*=+*-=+-*=+*-=+-*=+-*=+-*=+-*=+-*= //
@@ -40,11 +51,19 @@ void DeviceAllocator::to_cpu(nn_real *cpu_data)
 DeviceMatrix::DeviceMatrix(int n_rows, int n_cols)
 {
   // TODO: implement this constructor
+  this->n_rows = n_rows;
+  this->n_cols = n_cols;
+  this->allocator = std::make_unique<DeviceAllocator>(n_rows * n_cols);
+  this->data = this->allocator->data;
 }
 
 DeviceMatrix::DeviceMatrix(arma::Mat<nn_real> &cpu_mat)
 {
   // TODO: implement this constructor
+  this->n_rows = cpu_mat.n_rows;
+  this->n_cols = cpu_mat.n_cols;
+  this->allocator = std::make_unique<DeviceAllocator>(cpu_mat.memptr(), cpu_mat.n_elem);
+  this->data = this->allocator->data;
 }
 
 void DeviceMatrix::to_cpu(arma::Mat<nn_real> &cpu_mat)
@@ -78,6 +97,19 @@ __global__ void MatSigmoid(DeviceMatrix src, DeviceMatrix dst)
 {
   // TODO: implement this kernel function
   // Hint: Use Exp() from common.h
+  // Sigmod = 1 / (1 + exp(-x))
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+          i < src.n_rows;
+          i += blockDim.x * gridDim.x) {
+            for (int j = blockIdx.y * blockDim.y + threadIdx.y;
+                    j < src.n_cols;
+                    j += blockDim.y * gridDim.y) {
+                      dst(i, j) = 1 / (1 + Exp(-src(i, j)));
+                    }
+          }
+  // if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0) {
+  //   printf("dst(0, 0) = %f, dst(0, 1) = %f\n", dst(0, 0), dst(0, 1));
+  // }
 }
 
 /**
@@ -204,7 +236,9 @@ __global__ void Warmup() {}
 void DSigmoid(DeviceMatrix src, DeviceMatrix dst)
 {
   // TODO: implement this function
-
+  dim3 block = {32, 32};
+  dim3 grid = {src.n_rows + block.x - 1 / block.x, src.n_cols + block.y - 1 / block.y};
+  MatSigmoid<<<grid, block>>>(src, dst);
   CHECK_LAUNCH("DSigmoid");
 }
 
