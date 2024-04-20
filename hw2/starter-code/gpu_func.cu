@@ -124,6 +124,15 @@ __global__ void MatRepeatColVec(DeviceMatrix src, DeviceMatrix dst,
                                 int repeat)
 {
   // TODO: implement this kernel function
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+          i < src.n_rows;
+          i += blockDim.x * gridDim.x) {
+            for (int j = blockIdx.y * blockDim.y + threadIdx.y;
+                    j < repeat;
+                    j += blockDim.y * gridDim.y) {
+                      dst(i, j) = src(i, 0);
+                    }
+          }
 }
 
 /**
@@ -140,6 +149,28 @@ __global__ void MatSum(DeviceMatrix src, DeviceMatrix dst, nn_real alpha,
                        int axis)
 {
   // TODO: implement this kernel function
+  if (axis == 0) {
+    for (int j = blockIdx.x * blockDim.x + threadIdx.x;
+            j < src.n_cols;
+            j += blockDim.x * gridDim.x) {
+              nn_real sum = 0;
+              for (int i = 0; i < src.n_rows; i++) {
+                sum += src(i, j);
+              }
+              dst(0, j) = alpha * sum;
+            }
+  }
+  else {
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+            i < src.n_rows; 
+            i += blockDim.x * gridDim.x) {
+              nn_real sum = 0;
+              for (int j = 0; j < src.n_cols; j++) {
+                sum += src(i, j);
+              }
+              dst(i, 0) = alpha * sum;
+            }
+  }
 }
 
 /**
@@ -161,6 +192,34 @@ __global__ void MatSoftmax(DeviceMatrix src, DeviceMatrix dst, int axis)
    * the row by iterating through elements in the row, and then replace
    * dst(row, col) with the exponential of src(row, col) divided by the sum.
    */
+   if (axis == 0)
+   {
+      for (int j = blockIdx.x * blockDim.x + threadIdx.x;
+              j < src.n_cols;
+              j += blockDim.x * gridDim.x) {
+                nn_real sum = 0;
+                for (int i = 0; i < src.n_rows; i++) {
+                  sum += Exp(src(i, j));
+                }
+                for (int i = 0; i < src.n_rows; i++) {
+                  dst(i, j) = Exp(src(i, j)) / sum;
+                }
+              }
+   }
+   else
+   {
+      for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+              i < src.n_rows;
+              i += blockDim.x * gridDim.x) {
+                nn_real sum = 0;
+                for (int j = 0; j < src.n_cols; j++) {
+                  sum += Exp(src(i, j));
+                }
+                for (int j = 0; j < src.n_cols; j++) {
+                  dst(i, j) = Exp(src(i, j)) / sum;
+                }
+              }
+   }
 }
 
 /**
@@ -180,6 +239,15 @@ __global__ void MatCrossEntropyLoss(DeviceMatrix y_pred, DeviceMatrix y,
    * element-wise multiplication and log is applied element-wise. Use
    * Log() from common.h
    */
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+          i < y_pred.n_rows;
+          i += blockDim.x * gridDim.x) {
+            for (int j = blockIdx.y * blockDim.y + threadIdx.y;
+                    j < y_pred.n_cols;
+                    j += blockDim.y * gridDim.y) {
+                      loss(i, j) = -y(i, j) * Log(y_pred(i, j));
+                    }
+          }
 }
 
 /**
@@ -195,6 +263,15 @@ __global__ void MatElemArith(DeviceMatrix A, DeviceMatrix B, nn_real alpha,
                              nn_real beta)
 {
   // TODO: implement this kernel function
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+          i < A.n_rows;
+          i += blockDim.x * gridDim.x) {
+            for (int j = blockIdx.y * blockDim.y + threadIdx.y;
+                    j < A.n_cols;
+                    j += blockDim.y * gridDim.y) {
+                      A(i, j) = alpha * (A(i, j) + beta * B(i, j));
+                    }
+          }
 }
 
 /**
@@ -207,6 +284,15 @@ __global__ void MatElemArith(DeviceMatrix A, DeviceMatrix B, nn_real alpha,
 __global__ void MatSquare(DeviceMatrix src, DeviceMatrix dst)
 {
   // TODO: implement this kernel function
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+          i < src.n_rows;
+          i += blockDim.x * gridDim.x) {
+            for (int j = blockIdx.y * blockDim.y + threadIdx.y;
+                    j < src.n_cols;
+                    j += blockDim.y * gridDim.y) {
+                      dst(i, j) = src(i, j) * src(i, j);
+                    }
+          }
 }
 
 /**
@@ -225,6 +311,15 @@ __global__ void MatSigmoidBackProp(DeviceMatrix da1, DeviceMatrix a1,
    * Hint: This kernel computes dz1 = da1 * a1 * (1 - a1), where * denotes
    * element-wise multiplication.
    */
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x;
+          i < da1.n_rows;
+          i += blockDim.x * gridDim.x) {
+            for (int j = blockIdx.y * blockDim.y + threadIdx.y;
+                    j < da1.n_cols;
+                    j += blockDim.y * gridDim.y) {
+                      dz1(i, j) = da1(i, j) * a1(i, j) * (1 - a1(i, j));
+                    }
+          }
 }
 
 __global__ void Warmup() {}
@@ -237,7 +332,7 @@ void DSigmoid(DeviceMatrix src, DeviceMatrix dst)
 {
   // TODO: implement this function
   dim3 block = {32, 32};
-  dim3 grid = {src.n_rows + block.x - 1 / block.x, src.n_cols + block.y - 1 / block.y};
+  dim3 grid = {(src.n_rows + block.x - 1) / block.x, (src.n_cols + block.y - 1) / block.y};
   MatSigmoid<<<grid, block>>>(src, dst);
   CHECK_LAUNCH("DSigmoid");
 }
@@ -245,20 +340,43 @@ void DSigmoid(DeviceMatrix src, DeviceMatrix dst)
 void DRepeatColVec(DeviceMatrix src, DeviceMatrix dst, int repeat)
 {
   // TODO: implement this function
-
+  dim3 block = {32, 32};
+  dim3 grid = {(src.n_rows + block.x - 1) / block.x, (src.n_cols + block.y - 1) / block.y};
+  MatRepeatColVec<<<grid, block>>>(src, dst, repeat);
   CHECK_LAUNCH("DRepeatColVec");
 }
 
 void DSum(DeviceMatrix src, DeviceMatrix dst, nn_real alpha, int axis)
 {
   // TODO: implement this function
-
+  int block = 32;
+  int grid = 0;
+  if (axis == 0)
+  {
+    grid = (src.n_cols + block - 1) / block;
+  }
+  else
+  {
+    grid = (src.n_rows + block - 1) / block;
+  }
+  MatSum<<<grid, block>>>(src, dst, alpha, axis);
   CHECK_LAUNCH("DSum");
 }
 
 void DSoftmax(DeviceMatrix src, DeviceMatrix dst, int axis)
 {
   // TODO: implement this function
+  int block = 32;
+  int grid = 0;
+  if (axis == 0)
+  {
+    grid = (src.n_cols + block - 1) / block;
+  }
+  else
+  {
+    grid = (src.n_rows + block - 1) / block;
+  }
+  MatSoftmax<<<grid, block>>>(src, dst, axis);
 
   CHECK_LAUNCH("DSoftmax");
 }
@@ -271,12 +389,22 @@ void DCELoss(DeviceMatrix y_pred, DeviceMatrix y, DeviceMatrix loss)
    * MatCrossEntropyLoss. Call DSum twice to compute the sum of all elements
    * in T.
    */
+  DeviceMatrix temp_loss1(y.n_rows, y.n_cols);
+  DeviceMatrix temp_loss2(y.n_rows, 1);
+  dim3 block = {32, 32};
+  dim3 grid = {(y.n_rows + block.x - 1) / block.x, (y.n_cols + block.y - 1) / block.y};
+  MatCrossEntropyLoss<<<grid, block>>>(y_pred, y, temp_loss1);
+  DSum(temp_loss1, temp_loss2, 1, 1);
+  DSum(temp_loss2, loss, 1, 0);
   CHECK_LAUNCH("DCELoss");
 }
 
 void DElemArith(DeviceMatrix A, DeviceMatrix B, nn_real alpha, nn_real beta)
 {
   // TODO: implement this function
+  dim3 block = {32, 32};
+  dim3 grid = {(A.n_rows + block.x - 1) / block.x, (A.n_cols + block.y - 1) / block.y};
+  MatElemArith<<<grid, block>>>(A, B, alpha, beta);
 
   CHECK_LAUNCH("DElemArith");
 }
@@ -285,12 +413,20 @@ void DSquare(DeviceMatrix src, DeviceMatrix dst)
 {
   // TODO: implement this function
 
+  dim3 block = {32, 32};
+  dim3 grid = {(src.n_rows + block.x - 1) / block.x, (src.n_cols + block.y - 1) / block.y};
+  MatSquare<<<grid, block>>>(src, dst);
+
   CHECK_LAUNCH("DSquare");
 }
 
 void DSigmoidBackprop(DeviceMatrix da1, DeviceMatrix a1, DeviceMatrix dz1)
 {
   // TODO: implement this function
+
+  dim3 block = {32, 32};
+  dim3 grid = {(da1.n_rows + block.x - 1) / block.x, (da1.n_cols + block.y - 1) / block.y};
+  MatSigmoidBackProp<<<grid, block>>>(da1, a1, dz1);
 
   CHECK_LAUNCH("DSigmoidBackprop");
 }
