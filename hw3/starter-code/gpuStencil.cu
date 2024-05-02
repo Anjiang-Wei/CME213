@@ -170,6 +170,13 @@ __global__
 void gpuStencilBlock(float* next, const float* __restrict__ curr, int gx, int nx, int ny,
                     float xcfl, float ycfl) {
     // TODO
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < nx; i += blockDim.x * gridDim.x) {
+        for (int j = blockIdx.y * blockDim.y + threadIdx.y; j < ny; j += blockDim.y * gridDim.y) {
+            int x  = i + order / 2;
+            int y = j + order / 2;
+            next[x + gx * y] = Stencil<order>(&curr[x + gx * y], gx, xcfl, ycfl);
+        }
+    }
 }
 
 /**
@@ -190,8 +197,22 @@ double gpuComputationBlock(Grid& curr_grid, const simParams& params) {
     Grid next_grid(curr_grid);
 
     // TODO: Declare variables/Compute parameters.
-    dim3 threads(0, 0);
-    dim3 blocks(0, 0);
+    float xcfl = params.xcfl();
+    float ycfl = params.ycfl();
+
+    int nx = params.nx();
+    int ny = params.ny();
+
+    int gx = params.gx();
+    int borderSize = params.borderSize();
+    int order = params.order();
+
+    const int numYPerStep = 32;
+    const int blocksize = 16;
+    int grid_size_x = (nx + blocksize - 1) / blocksize;
+    int grid_size_y = (ny + blocksize * numYPerStep - 1) / (blocksize * numYPerStep);
+    dim3 threads(blocksize, blocksize);
+    dim3 blocks(grid_size_x, grid_size_y);
 
     event_pair timer;
     start_timer(&timer);
@@ -201,6 +222,22 @@ double gpuComputationBlock(Grid& curr_grid, const simParams& params) {
         BC.updateBC(next_grid.dGrid_, curr_grid.dGrid_);
 
         // TODO: Apply stencil.
+        if (order == 2)
+        {
+            gpuStencilBlock<2, numYPerStep><<<blocks, threads>>>(next_grid.dGrid_, curr_grid.dGrid_, gx, nx, ny, xcfl, ycfl);
+        }
+        else if (order == 4)
+        {
+            gpuStencilBlock<4, numYPerStep><<<blocks, threads>>>(next_grid.dGrid_, curr_grid.dGrid_, gx, nx, ny, xcfl, ycfl);
+        }
+        else if (order == 8)
+        {
+            gpuStencilBlock<8, numYPerStep><<<blocks, threads>>>(next_grid.dGrid_, curr_grid.dGrid_, gx, nx, ny, xcfl, ycfl);
+        }
+        else
+        {
+            printf("ERROR: Order %d not supported", order);
+        }
 
         Grid::swap(curr_grid, next_grid);
     }
