@@ -72,6 +72,11 @@ __global__
 void gpuStencilGlobal(float* next, const float* __restrict__ curr, int gx, int nx, int ny,
                 float xcfl, float ycfl) {
     // TODO
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < nx * ny; i += blockDim.x * gridDim.x) {
+        int x = i % nx + (order / 2);
+        int y = i / nx + (order / 2);
+        next[x + gx * y] = Stencil<order>(&curr[x + gx * y], gx, xcfl, ycfl);
+    }
 }
 
 /**
@@ -92,6 +97,18 @@ double gpuComputationGlobal(Grid& curr_grid, const simParams& params) {
     Grid next_grid(curr_grid);
 
     // TODO: Declare variables/Compute parameters.
+    float xcfl = params.xcfl();
+    float ycfl = params.ycfl();
+
+    int nx = params.nx();
+    int ny = params.ny();
+
+    int gx = params.gx();
+    int borderSize = params.borderSize();
+    int order = params.order();
+
+    const int block_size = 32;
+    int grid_size = (nx * ny + block_size - 1) / block_size;
 
     event_pair timer;
     start_timer(&timer);
@@ -101,9 +118,27 @@ double gpuComputationGlobal(Grid& curr_grid, const simParams& params) {
         BC.updateBC(next_grid.dGrid_, curr_grid.dGrid_);
 
         // TODO: Apply stencil.
+        if (order == 2)
+        {
+            gpuStencilGlobal<2><<<grid_size, block_size>>>(next_grid.dGrid_, curr_grid.dGrid_, gx, nx, ny, xcfl, ycfl);
+        }
+        else if (order == 4)
+        {
+            gpuStencilGlobal<4><<<grid_size, block_size>>>(next_grid.dGrid_, curr_grid.dGrid_, gx, nx, ny, xcfl, ycfl);
+        }
+        else if (order == 8)
+        {
+            gpuStencilGlobal<8><<<grid_size, block_size>>>(next_grid.dGrid_, curr_grid.dGrid_, gx, nx, ny, xcfl, ycfl);
+        }
+        else
+        {
+            printf("ERROR: Order %d not supported", order);
+        }
 
         Grid::swap(curr_grid, next_grid);
     }
+
+    // curr_grid.saveStateToFile("final_gpu_global.csv");
 
     check_launch("gpuStencilGlobal");
     return stop_timer(&timer);

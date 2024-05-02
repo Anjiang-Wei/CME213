@@ -30,4 +30,6 @@ ax.set_ylabel('Y')
 ax.set_zlabel('Temperature')
 ax.set_zlim(-1, 1)
 
-plt.show()
+# plt.show()
+fname = sys.argv[1].replace('.csv', '.pdf')
+plt.savefig(fname)
