@@ -84,6 +84,16 @@ __global__ void BasicMatMulColumnMajor(DeviceMatrix A, DeviceMatrix B,
                                        DeviceMatrix C, nn_real alpha,
                                        nn_real beta) {
   // TODO: Implement this kernel
+  float Cval = 0;
+  int i = blockIdx.x * blockDim.x + threadIdx.x; // < C row, consecutive threads
+  int j = blockIdx.y * blockDim.y + threadIdx.y; // < C column
+  if (i < C.n_rows && j < C.n_cols)
+  {
+    for (int e = 0; e < A.n_cols; e++) {
+      Cval += A(i, e, false) * B(e, j, false);
+    }
+    C(i, j, false) = alpha * Cval + beta * C(i, j, false);
+  }
 }
 
 void basicGEMMColumnMajor(DeviceMatrix A, DeviceMatrix B, DeviceMatrix C,
@@ -91,7 +101,10 @@ void basicGEMMColumnMajor(DeviceMatrix A, DeviceMatrix B, DeviceMatrix C,
   // TODO: Implement this kernel wrapper
   // Remember that column major means that consecutive threads compute
   // consecutive elements in a column of the output matrix
-
+  const int BLOCK_SIZE = 16;
+  dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
+  dim3 dimGrid((C.n_rows + BLOCK_SIZE - 1)/ BLOCK_SIZE, (C.n_cols + BLOCK_SIZE - 1)/ BLOCK_SIZE);
+  BasicMatMulColumnMajor<<<dimGrid, dimBlock>>>(A, B, C, alpha, beta);
   check_launch("basicGEMMColumnMajor");
 }
 
@@ -99,6 +112,16 @@ __global__ void BasicMatMulRowMajor(DeviceMatrix A, DeviceMatrix B,
                                     DeviceMatrix C, nn_real alpha,
                                     nn_real beta) {
   // TODO: Implement this kernel
+  float Cval = 0;
+  int i = blockIdx.y * blockDim.y + threadIdx.y; // < C row
+  int j = blockIdx.x * blockDim.x + threadIdx.x; // < C column, consecutive threads
+  if (i < C.n_rows && j < C.n_cols)
+  {
+    for (int e = 0; e < A.n_cols; e++) {
+      Cval += A(i, e, false) * B(e, j, false);
+    }
+    C(i, j, false) = alpha * Cval + beta * C(i, j, false);
+  }
 }
 
 void basicGEMMRowMajor(DeviceMatrix A, DeviceMatrix B, DeviceMatrix C,
@@ -106,7 +129,10 @@ void basicGEMMRowMajor(DeviceMatrix A, DeviceMatrix B, DeviceMatrix C,
   // TODO: Implement this kernel wrapper
   // Remember that row major means that consecutive threads compute
   // consecutive elements in a row of the output matrix
-
+  const int BLOCK_SIZE = 16;
+  dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
+  dim3 dimGrid((C.n_cols + BLOCK_SIZE - 1)/ BLOCK_SIZE, (C.n_rows + BLOCK_SIZE - 1)/ BLOCK_SIZE);
+  BasicMatMulRowMajor<<<dimGrid, dimBlock>>>(A, B, C, alpha, beta);
   check_launch("basicGEMMRowMajor");
 }
 
