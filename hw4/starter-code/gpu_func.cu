@@ -140,12 +140,52 @@ __global__ void SharedMemoryMatMul(DeviceMatrix A, DeviceMatrix B,
                                    nn_real beta) {
 
   // TODO: Implement this kernel
+  __shared__ nn_real As[blockSizeY][blockSizeX];
+  __shared__ nn_real Bs[blockSizeY][blockSizeX];
+
+  int blockX = blockIdx.x;
+  int blockY = blockIdx.y;
+  int threadX = threadIdx.x;
+  int threadY = threadIdx.y;
+
+  int row = blockIdx.y * blockDim.y + threadIdx.y;
+  int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+  nn_real Cvalue = 0;
+  for (int m = 0; m < (A.n_cols + blockSizeX - 1) / blockSizeX; m++) {
+    if (m * blockSizeX + threadX < A.n_cols && row < A.n_rows) {
+      As[threadY][threadX] = A(row, m * blockSizeX + threadX, false);
+    }
+    else {
+      As[threadY][threadX] = 0;
+    }
+    if (m * blockSizeY + threadY < B.n_rows && col < B.n_cols) {
+      Bs[threadY][threadX] = B(m * blockSizeY + threadY, col, false);
+    }
+    else {
+      Bs[threadY][threadX] = 0;
+    }
+    __syncthreads();
+
+    for (int e = 0; e < blockSizeX; e++) {
+      Cvalue += As[threadY][e] * Bs[e][threadX];
+    }
+    __syncthreads();
+  }
+
+  if (row < C.n_rows && col < C.n_cols) {
+    C(row, col, false) = alpha * Cvalue + beta * C(row, col, false);
+  }
 }
 
 void sharedMemoryGEMM(DeviceMatrix A, DeviceMatrix B, DeviceMatrix C,
                       nn_real alpha, nn_real beta) {
   // TODO: Implement this wrapper
-
+  const int blockSizeX = 32;
+  const int blockSizeY = 32;
+  dim3 dimBlock(blockSizeX, blockSizeY);
+  dim3 dimGrid((C.n_cols + dimBlock.x - 1)/ dimBlock.x, (C.n_rows + dimBlock.y - 1)/ dimBlock.y);
+  SharedMemoryMatMul<blockSizeX, blockSizeY><<<dimGrid, dimBlock>>>(A, B, C, alpha, beta);
   check_launch("sharedMemoryGEMM");
 }
 
