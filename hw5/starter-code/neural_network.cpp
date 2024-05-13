@@ -357,6 +357,37 @@ void DataParallelNeuralNetwork::backward(const DeviceMatrix &y,
    * Examples of CUDA kernels to use: DElemArith, to_gpu, tiledGEMM, DSum,
    * DSigmoidBackprop.
    */
+
+  DeviceMatrix diff(cache.yc.n_rows, cache.yc.n_cols);
+  DElemArith(cache.yc, y, 1.0, -1.0); // yc - y
+  cache.yc.to_gpu(diff);
+  DeviceMatrix diff_zero(diff.n_rows, diff.n_cols);
+  DElemArith(diff, diff_zero, grad_weight, 0.0); // grad_weight * (yc - y)
+
+  DeviceMatrix grad_W1(W[1].n_rows, W[1].n_cols);
+  tiledGEMM(diff, false, cache.a[0], true, grad_W1, 1.0, 0.0);
+  DElemArith(grad_W1, W[1], 1.0, reg);
+
+  DeviceMatrix grad_b1(b[1].n_rows, b[1].n_cols);
+  DSum(diff, grad_b1, 1.0, 1);
+
+  DeviceMatrix da1(cache.a[0].n_rows, cache.a[0].n_cols);
+  tiledGEMM(W[1], true, diff, false, da1, 1.0, 0.0);
+
+  DeviceMatrix dz1(cache.a[0].n_rows, cache.a[0].n_cols);
+  DSigmoidBackprop(da1, cache.a[0], dz1);
+
+  DeviceMatrix grad_W0(W[0].n_rows, W[0].n_cols);
+  tiledGEMM(dz1, false, cache.X, true, grad_W0, 1.0, 0.0);
+  DElemArith(grad_W0, W[0], 1.0, reg);
+
+  DeviceMatrix grad_b0(b[0].n_rows, b[0].n_cols);
+  DSum(dz1, grad_b0, 1.0, 1);
+
+  grads.dW[0] = grad_W0;
+  grads.db[0] = grad_b0;
+  grads.dW[1] = grad_W1;
+  grads.db[1] = grad_b1;
 }
 
 void DataParallelNeuralNetwork::step()
