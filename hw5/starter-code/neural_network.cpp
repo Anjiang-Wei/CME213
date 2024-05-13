@@ -263,14 +263,8 @@ DataParallelNeuralNetwork::DataParallelNeuralNetwork(NeuralNetwork &nn,
       W[i] = DeviceMatrix(nn.W[i]);
       b[i] = DeviceMatrix(nn.b[i]);
     }
-    cache.X  = DeviceMatrix(batch_size, nn.W[0].n_rows);
-    cache.yc = DeviceMatrix(batch_size, nn.W[nn.num_layers - 1].n_cols);
     cache.a.resize(nn.num_layers);
     cache.z.resize(nn.num_layers);
-    for (int i = 0; i < nn.num_layers; ++i) {
-      cache.a[i] = DeviceMatrix(batch_size, nn.W[i].n_cols);
-      cache.z[i] = DeviceMatrix(batch_size, nn.W[i].n_cols);
-    }
     grads = GPUGrads(nn);
 }
 
@@ -283,6 +277,36 @@ void DataParallelNeuralNetwork::forward(const DeviceMatrix &X)
    * any new CUDA kernel.
    * Examples of kernels to use: DRepeatColVec, tiledGEMM, DSigmoid, DSoftmax.
    */
+  DeviceMatrix z1(W[0].n_rows, X.n_cols);
+  tiledGEMM(W[0], false, X, false, z1, 1.0, 0.0);
+
+  DeviceMatrix repeated_bias1(z1.n_rows, z1.n_cols);
+  DRepeatColVec(b[0], repeated_bias1, z1.n_cols);
+
+  DElemArith(z1, repeated_bias1, 1.0, 1.0);
+
+  DeviceMatrix a1(z1.n_rows, z1.n_cols);
+  DSigmoid(z1, a1);
+
+  cache.X = X;
+  cache.z[0] = z1;
+  cache.a[0] = a1;
+  /// --------
+
+  DeviceMatrix z2(W[1].n_rows, a1.n_cols);
+  tiledGEMM(W[1], false, a1, false, z2, 1.0, 0.0);
+
+  DeviceMatrix repeated_bias2(z2.n_rows, z2.n_cols);
+  DRepeatColVec(b[1], repeated_bias2, z2.n_cols);
+
+  DElemArith(z2, repeated_bias2, 1.0, 1.0);
+
+  DeviceMatrix a2(z2.n_rows, z2.n_cols);
+  DSoftmax(z2, a2, 0);
+
+  cache.z[1] = z2;
+  cache.a[1] = a2;
+  cache.yc = a2;
 }
 
 nn_real DataParallelNeuralNetwork::loss(const DeviceMatrix &y, nn_real weight)
