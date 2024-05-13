@@ -397,6 +397,16 @@ void DataParallelNeuralNetwork::step()
    * HINT: See part of the CPU implementation void train above.
    * Example of CUDA kernel to use: DElemArith.
    */
+  // // Optimizer step
+  //     for (int i = 0; i < nn.W.size(); ++i)
+  //       nn.W[i] -= hparams.learning_rate * bpgrads.dW[i];
+
+  //     for (int i = 0; i < nn.b.size(); ++i)
+  //       nn.b[i] -= hparams.learning_rate * bpgrads.db[i];
+  for (int i = 0; i < W.size(); ++i) {
+    DElemArith(W[i], grads.dW[i], 1.0, -lr);
+    DElemArith(b[i], grads.db[i], 1.0, -lr);
+  }
 }
 
 void DataParallelNeuralNetwork::to_cpu(NeuralNetwork &nn)
