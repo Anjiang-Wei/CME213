@@ -205,6 +205,10 @@ GPUGrads::GPUGrads(const NeuralNetwork &nn)
    * allocated with gpu_mem_pool will be used to set up dW and db. Calculate the
    * total number of elements that we need to allocate memory for.
    */
+  for (int i = 0; i < nn.num_layers; ++i) {
+    total_size += nn.W[i].n_rows * nn.W[i].n_cols;
+    total_size += nn.b[i].n_rows * nn.b[i].n_cols;
+  }
   gpu_mem_pool =
       std::make_shared<DeviceAllocator>(total_size * sizeof(nn_real));
   nn_real *gpu_mem_pool_start = gpu_mem_pool.get()->memptr();
@@ -224,6 +228,15 @@ GPUGrads::GPUGrads(const NeuralNetwork &nn)
    * The template pseudo-code looks like:
    * dW[...] = DeviceMatrix(gpu_mem_pool_start + ..., n_rows, n_cols);
    */
+  for (int i = 0; i < nn.num_layers; ++i) {
+    int num_weight_elements = nn.W[i].n_rows * nn.W[i].n_cols;
+    dW[i] = DeviceMatrix(gpu_mem_pool_start + offset, nn.W[i].n_rows, nn.W[i].n_cols);
+    offset += num_weight_elements;
+
+    int num_bias_elements = nn.b[i].n_rows * nn.b[i].n_cols;
+    db[i] = DeviceMatrix(gpu_mem_pool_start + offset, nn.b[i].n_rows, nn.b[i].n_cols);
+    offset += num_bias_elements;
+  }
 }
 
 DataParallelNeuralNetwork::DataParallelNeuralNetwork(NeuralNetwork &nn,
@@ -239,6 +252,26 @@ DataParallelNeuralNetwork::DataParallelNeuralNetwork(NeuralNetwork &nn,
    * will need to correctly initialize at least: cache.a, cache.z, W[], b[], and
    * reg.
    */
+   this->reg       = reg;
+   this->lr        = lr;
+   this->num_procs = num_procs;
+   assert(nn.W.size() == nn.num_layers && nn.b.size() == nn.num_layers);
+   W.resize(nn.num_layers);
+   b.resize(nn.num_layers);
+   for (size_t i = 0; i < nn.W.size(); ++i) {
+      // Create DeviceMatrix for weights and biases, copying data from the CPU to GPU
+      W[i] = DeviceMatrix(nn.W[i]);
+      b[i] = DeviceMatrix(nn.b[i]);
+    }
+    cache.X  = DeviceMatrix(batch_size, nn.W[0].n_rows);
+    cache.yc = DeviceMatrix(batch_size, nn.W[nn.num_layers - 1].n_cols);
+    cache.a.resize(nn.num_layers);
+    cache.z.resize(nn.num_layers);
+    for (int i = 0; i < nn.num_layers; ++i) {
+      cache.a[i] = DeviceMatrix(batch_size, nn.W[i].n_cols);
+      cache.z[i] = DeviceMatrix(batch_size, nn.W[i].n_cols);
+    }
+    grads = GPUGrads(nn);
 }
 
 void DataParallelNeuralNetwork::forward(const DeviceMatrix &X)
@@ -294,4 +327,8 @@ void DataParallelNeuralNetwork::to_cpu(NeuralNetwork &nn)
    * TODO: Implement this function.
    * HINT: Use DeviceMatrix::to_cpu. You need to copy W[] and b[].
    */
+  for (size_t i = 0; i < nn.W.size(); ++i) {
+    W[i].to_cpu(nn.W[i]);
+    b[i].to_cpu(nn.b[i]);
+  }
 }
