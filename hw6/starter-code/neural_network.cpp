@@ -254,7 +254,6 @@ DataParallelNeuralNetwork::DataParallelNeuralNetwork(NeuralNetwork &nn,
 
 void DataParallelNeuralNetwork::forward(const DeviceMatrix &X) {
   assert(X.n_rows == W[0].n_cols);
-  // printf("forward 0\n");
   X.to_gpu(cache.X);
   assert(cache.X.n_rows == X.n_rows && cache.X.n_cols == X.n_cols);
   int N = X.n_cols;
@@ -281,7 +280,7 @@ void DataParallelNeuralNetwork::forward(const DeviceMatrix &X) {
   assert(cache.a[1].n_rows = cache.z[1].n_rows);
   assert(cache.a[1].n_cols = cache.z[1].n_cols);
   DSoftmax(cache.z[1], cache.a[1], 0);
-  // printf("forward 1\n");
+  
   cache.a[1].to_gpu(cache.yc);
 }
 
@@ -323,7 +322,7 @@ nn_real DataParallelNeuralNetwork::loss(const DeviceMatrix &y, nn_real weight) {
    */
   nn_real total_loss = data_loss + reg_loss / nn_real(num_procs);
   nn_real global_loss;
-  MPI_Allreduce(&total_loss, &global_loss, 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(&total_loss, &global_loss, 1, MPI_FP, MPI_SUM, MPI_COMM_WORLD);
   return global_loss;
 }
 
@@ -332,7 +331,6 @@ void DataParallelNeuralNetwork::backward(const DeviceMatrix &y,
   DeviceMatrix diff = cache.a[1];  // shallow copy
   DElemArith(diff, y, grad_weight, -1.0);
 
-  // printf("backward 1\n");
   W[1].to_gpu(grads.dW[1]);
   tiledGEMM(diff, false, cache.a[0], true, grads.dW[1], 1.0, reg);
 
@@ -344,7 +342,6 @@ void DataParallelNeuralNetwork::backward(const DeviceMatrix &y,
   DeviceMatrix dz1 = da1;  // shallow copy
   DSigmoidBackprop(da1, cache.a[0], dz1);
 
-  // printf("backward 2\n");
   W[0].to_gpu(grads.dW[0]);
   tiledGEMM(dz1, false, cache.X, true, grads.dW[0], 1.0, reg);
 
@@ -356,7 +353,7 @@ void DataParallelNeuralNetwork::backward(const DeviceMatrix &y,
    * of computing the average has already been completed using grad_weight.
    */
   nn_real* grads_ptr = grads.gpu_mem_pool->memptr();
-  MPI_Allreduce(grads_ptr, grads_ptr, grads.total_elements, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(grads_ptr, grads_ptr, grads.total_elements, MPI_FP, MPI_SUM, MPI_COMM_WORLD);
 }
 
 void DataParallelNeuralNetwork::step() {
@@ -379,14 +376,13 @@ void DataParallelNeuralNetwork::train(NeuralNetwork &nn, arma::Mat<nn_real> &X,
    * The last minibatch in an epoch may be smaller than previous minibatches in 
    * the epoch; you can use DeviceMatrix::set_n_cols() to deal with this case.
    */
-
   int rank, num_procs;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
   if (num_procs > 1) {
-      MPI_Bcast(X.memptr(), X.n_elem, MPI_FLOAT, 0, MPI_COMM_WORLD);
-      MPI_Bcast(y.memptr(), y.n_elem, MPI_FLOAT, 0, MPI_COMM_WORLD);
+      MPI_Bcast(X.memptr(), X.n_elem, MPI_FP, 0, MPI_COMM_WORLD);
+      MPI_Bcast(y.memptr(), y.n_elem, MPI_FP, 0, MPI_COMM_WORLD);
   }
 
   int N = X.n_cols;
