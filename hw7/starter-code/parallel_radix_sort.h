@@ -78,6 +78,9 @@ std::vector<uint> scanGlobalHisto(
 ) {
     std::vector<uint> globalHistoExScan(numBuckets, 0);
     // TODO
+    for (uint i = 1; i < numBuckets; ++i) {
+        globalHistoExScan[i] = globalHistoExScan[i - 1] + globalHisto[i - 1];
+    }
     return globalHistoExScan;
 }
 
@@ -95,6 +98,17 @@ std::vector<uint> computeBlockExScanFromGlobalHisto(
 ) {
     std::vector<uint> blockExScan(numBuckets * numBlocks, 0);
     // TODO
+    // Compute the block-wise exclusive scan
+#pragma omp parallel for
+    for (uint bucket = 0; bucket < numBuckets; ++bucket) {
+        // Start with the global exclusive scan value
+        uint prefixSum = globalHistoExScan[bucket];
+
+        for (uint block = 0; block < numBlocks; ++block) {
+            blockExScan[block * numBuckets + bucket] = prefixSum;
+            prefixSum += blockHistograms[block * numBuckets + bucket];
+        }
+    }
     return blockExScan;
 }
 
@@ -114,6 +128,26 @@ void populateOutputFromBlockExScan(
     std::vector<uint> &sorted
 ) {
     // TODO
+    uint mask = (1 << numBits) - 1;
+
+#pragma omp parallel for
+    for (uint block = 0; block < numBlocks; ++block) {
+        std::vector<uint> localOffsets(numBuckets, 0);
+
+        // Calculate the starting offset for this block
+        for (uint bucket = 0; bucket < numBuckets; ++bucket) {
+            localOffsets[bucket] = blockExScan[block * numBuckets + bucket];
+        }
+
+        // Populate the sorted array
+        uint startIdx = block * blockSize;
+        uint endIdx = std::min(startIdx + blockSize, static_cast<uint>(keys.size()));
+        for (uint i = startIdx; i < endIdx; ++i) {
+            uint key = (keys[i] >> startBit) & mask;
+            uint pos = localOffsets[key]++;
+            sorted[pos] = keys[i];
+        }
+    }
 }
 
 /* Function: radixSortParallelPass
