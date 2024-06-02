@@ -4,5 +4,5 @@
 #SBATCH --ntasks-per-node=2
 #SBATCH --gres=gpu:2
 
-make
+make -j
 nsys profile -f true --trace cuda,mpi,nvtx mpirun -n 2 ./main --gtest_filter=gtestProfile.* --gtest_color=no
